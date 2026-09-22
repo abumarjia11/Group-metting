@@ -1,73 +1,42 @@
 from flask import Flask, request, session, redirect
-from flask_socketio import SocketIO
-import os
-
 app = Flask(__name__)
-app.secret_key = "mysecretkey123"
-socketio = SocketIO(app, cors_allowed_origins="*")
-
+app.secret_key = "123"
 users = {"admin": {"pass": "admin123", "approved": True}}
-
-LOGIN_PAGE = """
-<h2>লগইন / রেজিস্ট্রেশন</h2>
-<form action='/register' method='post'>
-<input name='name' placeholder='নাম'><br><br>
-<input name='password' type='password' placeholder='পাসওয়ার্ড'><br><br>
-<button>রেজিস্ট্রেশন করুন</button>
-</form><hr>
-<form action='/login' method='post'>
-<input name='name' placeholder='নাম'><br><br>
-<input name='password' type='password' placeholder='পাসওয়ার্ড'><br><br>
-<button>লগইন করুন</button>
-</form>
-"""
-
-CHAT_PAGE = """
-<h3>স্বাগতম {user} ভাই</h3><div id='chat'></div>
-<input id='m' placeholder='মেসেজ লিখুন'><button onclick='send()'>Send</button>
-<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-<script>
-var socket = io();
-function send(){socket.emit('message', {msg: document.getElementById('m').value}); document.getElementById('m').value='';}
-socket.on('message', function(d){document.getElementById('chat').innerHTML += "<p><b>"+d.user+":</b> "+d.msg+"</p>";});
-</script>
-"""
 
 @app.route('/')
 def home():
     if 'user' in session:
-        return CHAT_PAGE.format(user=session['user'])
-    return LOGIN_PAGE
+        return f"<h3>Hi {session['user']}</h3><p>Login Success! Chat feature next step e add korbo.</p><a href='/admin'>Admin Panel</a>"
+    return """
+    <h2>Group Login</h2>
+    <form action='/register' method='post'><input name='name' placeholder='Name'><input name='password' placeholder='Pass'><button>Register</button></form>
+    <form action='/login' method='post'><input name='name' placeholder='Name'><input name='password' placeholder='Pass'><button>Login</button></form>
+    """
 
 @app.route('/register', methods=['POST'])
 def reg():
     n=request.form['name']; p=request.form['password']
-    if n in users: return "এই নামে আছে"
     users[n]={"pass":p,"approved":False}
-    return "রেজিস্ট্রেশন হয়েছে, এডমিন এপ্রুভ করলে ঢুকতে পারবেন। <a href='/'>Back</a>"
+    return "Wait for admin approve. <a href='/'>Back</a>"
 
 @app.route('/login', methods=['POST'])
 def log():
     n=request.form['name']; p=request.form['password']
-    if n not in users or users[n]['pass']!=p: return "ভুল পাসওয়ার্ড"
-    if not users[n]['approved']: return "ERROR: এডমিন এখনো অনুমোদন দেয়নি!"
+    if n not in users or users[n]['pass']!=p: return "Wrong pass"
+    if not users[n]['approved']: return "ERROR: Admin not approved"
     session['user']=n
     return redirect('/')
 
 @app.route('/admin')
 def admin():
-    pending=[u for u,d in users.items() if not d['approved']]
+    pending = [u for u,d in users.items() if not d['approved']]
     return f"Pending: {pending}<br><form action='/approve' method='post'><input name='name'><button>Approve</button></form>"
 
 @app.route('/approve', methods=['POST'])
 def approve():
     n=request.form['name']
     if n in users: users[n]['approved']=True
-    return f"{n} Approved <a href='/admin'>Back</a>"
-
-@socketio.on('message')
-def msg(data):
-    socketio.emit('message', {'user':session['user'], 'msg':data['msg']}, broadcast=True)
+    return f"{n} approved"
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+    app.run(host='0.0.0.0', port=10000)
